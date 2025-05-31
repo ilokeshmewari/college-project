@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabse';
 import { useRouter } from 'next/navigation';
 import { UserRound, X, MessageSquare } from 'lucide-react';
+import type { User } from '@supabase/supabase-js';
 
 type ProfileType = {
   name: string;
@@ -13,34 +14,46 @@ type ProfileType = {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<ProfileType | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [form, setForm] = useState<ProfileType>({ name: '', username: '', phone: '' });
 
   useEffect(() => {
     const fetchUserAndProfile = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return router.push('/auth/login');
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        router.push('/auth/login');
+        return;
+      }
+
       setUser(user);
 
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .single();
 
-      if (data) {
-        const isComplete = data.name && data.username;
-        setProfile(isComplete ? {
-          name: data.name,
-          username: data.username,
-          phone: data.phone || '',
-        } : null);
-      } else {
+      if (error) {
         await supabase.from('profiles').insert([{ id: user.id, email: user.email }]);
         setProfile(null);
+      } else {
+        const isComplete = data.name && data.username;
+        setProfile(
+          isComplete
+            ? {
+                name: data.name,
+                username: data.username,
+                phone: data.phone || '',
+              }
+            : null
+        );
       }
     };
 
@@ -127,7 +140,7 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Feedback Section (Promotional style) */}
+        {/* Feedback Section */}
         <div className="bg-gradient-to-r from-green-400 to-blue-500 text-white p-8 rounded-lg shadow-lg w-full md:w-1/2 flex flex-col items-center justify-center space-y-4">
           <MessageSquare className="w-16 h-16" />
           <h2 className="text-3xl font-bold">Help Improve Faculty Experience</h2>
